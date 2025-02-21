@@ -63,7 +63,10 @@
                     :src="img"
                     fit="cover"
                     class="topic-image"
-                    @click="previewImage(topic.post.images, index)"
+                    :preview-src-list="topic.post.images"
+                    :initial-index="index"
+                    preview-teleported
+                    hide-on-click-modal
                   />
                 </div>
 
@@ -214,7 +217,6 @@ import {
   Star,
   Opportunity
 } from '@element-plus/icons-vue'
-import { ElImageViewer } from 'element-plus'
 
 const router = useRouter()
 const loading = ref(false)
@@ -235,45 +237,6 @@ const bannerList = ref([
     image: 'https://picsum.photos/1200/300'
   }
 ])
-
-// 添加图片展示相关的状态
-const imageStartIndexMap = ref<Record<number, number>>({})
-
-// 获取要显示的图片
-const displayImages = (images: string[]) => {
-  const topicId = Number(Object.keys(imageStartIndexMap.value)[0])
-  const startIndex = imageStartIndexMap.value[topicId] || 0
-  return images.slice(startIndex, startIndex + 3)
-}
-
-// 上一组图片
-const prevImages = (topicId: number) => {
-  const currentStart = imageStartIndexMap.value[topicId] || 0
-  if (currentStart > 0) {
-    imageStartIndexMap.value[topicId] = currentStart - 3
-  }
-}
-
-// 下一组图片
-const nextImages = (topicId: number) => {
-  const topic = hotTopics.value.find(t => t.id === topicId)
-  if (!topic) return
-  
-  const currentStart = imageStartIndexMap.value[topicId] || 0
-  if (currentStart + 3 < topic.post.images.length) {
-    imageStartIndexMap.value[topicId] = currentStart + 3
-  }
-}
-
-// 预览图片
-const previewImage = (images: string[], index: number) => {
-  // 使用 element-plus 的图片预览功能
-  const imgUrls = images.map(url => ({ url }))
-  ElImageViewer({
-    urlList: imgUrls,
-    initialIndex: index
-  })
-}
 
 // 修改热门话题的数据结构
 const hotTopics = ref([
@@ -594,6 +557,15 @@ const getHeatClass = (heat: number) => {
                 aspect-ratio: 1;
                 border-radius: 4px;
                 cursor: pointer;
+                :deep(.el-image-viewer__wrapper) {
+                  .el-image-viewer__close {
+                    color: #fff;
+                  }
+                  .el-image-viewer__actions {
+                    opacity: 1;
+                    background: rgba(0, 0, 0, 0.7);
+                  }
+                }
               }
             }
 
@@ -714,48 +686,105 @@ const getHeatClass = (heat: number) => {
 
     .main-content {
       grid-template-columns: 1fr;
-      padding: 0;
+      padding: 12px;
+      width: 100%;
+      box-sizing: border-box;
 
       .section-card {
-        margin: 0 12px 16px;
+        margin: 0 0 16px;
         border-radius: 8px;
+        width: 100%;
+        overflow: hidden;
       }
 
       .hot-topics {
         .topic-list {
           .topic-item {
             margin: 0;
-            padding-bottom: 12px;
+            padding: 12px;
+
+            .circle-header {
+              padding: 0 0 12px;
+              
+              .circle-info {
+                .circle-avatar {
+                  width: 32px;
+                  height: 32px;
+                }
+                
+                .circle-name {
+                  font-size: 14px;
+                }
+              }
+            }
 
             .topic-content {
-              padding: 12px;
+              padding: 0;
 
               .topic-title {
                 font-size: 16px;
+                margin: 0 0 8px;
               }
 
               .topic-text {
                 font-size: 13px;
+                margin: 0 0 8px;
               }
 
               .topic-images {
                 gap: 4px;
+                margin-bottom: 12px;
+                
+                .topic-image {
+                  aspect-ratio: 1;
+                  width: 100%;
+                  height: auto;
+                }
+              }
+            }
+
+            .post-footer {
+              flex-direction: column;
+              gap: 8px;
+
+              .author-info {
+                .el-avatar,
+                .author-name {
+                  display: none;
+                }
+                
+                .info-divider:first-of-type {
+                  display: none;
+                }
+                
+                font-size: 12px;
+                gap: 6px;
+                color: #999;
+
+                display: flex;
+                align-items: center;
+                justify-content: flex-start;
               }
 
-              .post-footer {
-                flex-direction: column;
-                gap: 12px;
-                align-items: flex-start;
+              .interaction-stats {
+                order: 1;
+                width: 100%;
+                justify-content: space-around;
+                border-bottom: 1px solid #f0f0f0;
+                padding-bottom: 8px;
 
-                .author-info {
-                  order: 2;
-                }
+                span {
+                  padding: 4px 8px;
+                  font-size: 13px;
 
-                .interaction-stats {
-                  order: 1;
-                  width: 100%;
-                  justify-content: space-around;
+                  .el-icon {
+                    font-size: 14px;
+                  }
                 }
+              }
+
+              .author-info {
+                order: 2;
               }
             }
           }
@@ -763,19 +792,101 @@ const getHeatClass = (heat: number) => {
       }
 
       .recommended-posts {
-        .post-item {
-          margin: 0 12px;
-          padding: 16px 0;
+        .post-list {
+          .post-item {
+            margin: 0;
+            padding: 12px;
+            flex-direction: row;
+            align-items: center;
 
-          .post-cover {
-            width: 120px;
-            height: 80px;
+            .post-info {
+              margin-right: 12px;
+
+              .title {
+                font-size: 15px;
+                margin: 0 0 8px;
+              }
+
+              .summary {
+                font-size: 13px;
+                margin: 0 0 8px;
+                -webkit-line-clamp: 2;
+              }
+
+              .meta {
+                gap: 12px;
+                font-size: 12px;
+              }
+            }
+
+            .post-cover {
+              width: 96px;
+              height: 64px;
+              flex-shrink: 0;
+            }
           }
         }
       }
 
       .sidebar {
         display: none;
+      }
+    }
+  }
+
+  // 推荐作者区域移动端适配
+  .recommended-authors {
+    .panel-content {
+      .author-item {
+        padding: 12px;
+        gap: 8px;
+
+        .author-avatar {
+          width: 32px;
+          height: 32px;
+        }
+
+        .author-info {
+          .info-header {
+            margin-bottom: 2px;
+
+            .name {
+              font-size: 13px;
+            }
+
+            .follow-btn {
+              padding: 2px 8px;
+              font-size: 12px;
+            }
+          }
+
+          .description {
+            font-size: 12px;
+            margin-bottom: 4px;
+          }
+
+          .badges {
+            gap: 4px;
+
+            .badge-item {
+              height: 18px;
+              padding: 0 4px;
+              font-size: 11px;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // 底部信息栏移动端适配
+  .post-footer {
+    .author-info {
+      .info-divider,
+      .post-time,
+      .topic-heat {
+        display: flex;
+        align-items: center;
       }
     }
   }
@@ -941,31 +1052,6 @@ const getHeatClass = (heat: number) => {
 
       .el-icon {
         font-size: 16px;
-      }
-    }
-  }
-}
-
-// 移动端适配
-@media screen and (max-width: 768px) {
-  .post-footer {
-    flex-direction: column;
-    gap: 12px;
-    align-items: flex-start;
-
-    .author-info {
-      order: 2;
-      flex-wrap: wrap;
-      gap: 6px;
-    }
-
-    .interaction-stats {
-      order: 1;
-      width: 100%;
-      justify-content: space-around;
-
-      span {
-        padding: 6px 12px;
       }
     }
   }
