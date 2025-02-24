@@ -170,6 +170,11 @@ const loadMore = async () => {
     loading.value = false
   }
 }
+
+// 创建文章按钮点击事件
+const handleCreate = () => {
+  router.push('/posts/create')
+}
 </script>
 
 <style lang="scss" scoped>

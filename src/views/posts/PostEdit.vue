@@ -1,248 +1,696 @@
 <template>
   <div class="post-edit">
-    <div class="edit-header">
-      <h2>{{ isEdit ? '编辑文章' : '创建文章' }}</h2>
+    <!-- 隐藏默认布局的导航栏 -->
+    <div class="hide-nav" />
+
+    <!-- 顶部操作栏 -->
+    <div class="action-bar">
+      <!-- PC端布局 -->
+      <div class="pc-header">
+        <div class="left">
+          <el-button @click="router.back()" text>
+            <el-icon><ArrowLeft /></el-icon>
+            返回
+          </el-button>
+          <span class="divider">|</span>
+          <div class="title-input">
+            <span class="label">文章标题</span>
+            <el-input
+              v-model="docForm.title"
+              placeholder="这是文章标题"
+              :maxlength="100"
+              show-word-limit
+            />
+          </div>
+        </div>
+        <div class="right">
+          <el-button @click="saveDraft">保存草稿</el-button>
+          <el-button type="primary" @click="showPublishDialog">{{ isEdit ? '保存' : '发布' }}</el-button>
+        </div>
+      </div>
+
+      <!-- 移动端布局 -->
+      <div class="mobile-header">
+        <el-button @click="router.back()" text>
+          <el-icon><ArrowLeft /></el-icon>
+          返回
+        </el-button>
+        <div class="title-input">
+          <el-input
+            v-model="docForm.title"
+            placeholder="这是文章标题"
+            :maxlength="100"
+            show-word-limit
+          />
+        </div>
+        <div class="action-buttons">
+          <el-button type="primary" @click="showPublishDialog">{{ isEdit ? '保存' : '发布' }}</el-button>
+        </div>
+      </div>
     </div>
 
-    <el-form
-      ref="formRef"
-      :model="postForm"
-      :rules="rules"
-      label-width="80px"
-      class="edit-form"
+    <!-- 编辑区域 -->
+    <el-scrollbar class="editor-container">
+      <div class="editor-content">
+        <el-input
+          v-model="docForm.content"
+          type="textarea"
+          placeholder="请输入文章内容..."
+          :rows="20"
+          resize="none"
+        />
+      </div>
+    </el-scrollbar>
+
+    <!-- 发布文章弹窗 -->
+    <el-dialog
+      v-model="dialogVisible"
+      title="发布文章"
+      :width="isMobile ? '90%' : '500px'"
+      :close-on-click-modal="false"
+      :fullscreen="isMobile"
+      class="publish-dialog"
     >
-      <el-form-item label="标题" prop="title">
-        <el-input v-model="postForm.title" placeholder="请输入文章标题" />
-      </el-form-item>
-
-      <el-form-item label="分类" prop="categoryId">
-        <el-select v-model="postForm.categoryId" placeholder="请选择文章分类">
-          <el-option
-            v-for="item in categories"
-            :key="item.id"
-            :label="item.name"
-            :value="item.id"
+      <!-- 标签 -->
+      <el-row ref="tagRow">
+        <el-col :span="isMobile ? 24 : 3" class="label-col">标签</el-col>
+        <el-col :span="isMobile ? 24 : 21" class="input-col">
+          <div>
+            <el-tag
+              v-for="tag in docForm.tags"
+              :key="tag.id"
+              class="mx-1"
+              closable
+              :disable-transitions="false"
+              @close="handleCloseTag(tag)"
+            >
+              {{ tag.content }}
+            </el-tag>
+            <el-tag
+              v-if="showAddTagFlag"
+              @click="selectTagDialogFlag = true"
+              effect="plain"
+              type="info"
+              >+添加标签</el-tag
+            >
+            <el-dialog
+              ref="tagDialog"
+              v-model="selectTagDialogFlag"
+              :modal="false"
+              :append-to-body="false"
+              :style="tagDialogStyle"
+              draggable
+            >
+              <template #default>
+                <select-doc-tags :selectTags="docForm.tags" />
+              </template>
+            </el-dialog>
+          </div>
+        </el-col>
+      </el-row>
+      <!-- 封面 -->
+      <el-row>
+        <el-col :span="isMobile ? 24 : 3" class="label-col">封面</el-col>
+        <el-col :span="isMobile ? 24 : 21">
+          <el-row>
+            <el-col :span="isMobile ? 24 : 8">
+              <div>
+                <el-upload
+                  action="http://localhost:20011/blog/uploadBlogFile"
+                  :auto-upload="true"
+                  :show-file-list="false"
+                  :disabled="isDisabledUpload"
+                  :on-remove="handleRemove"
+                  v-model="uploadedFiles"
+                  :on-success="uploadSuccessHandle"
+                  :on-error="uploadErrorHandle"
+                  class="upload-cover"
+                >
+                  <!-- <div v-if="docForm.coverUrl" class="el-upload-list__item is-success"> -->
+                  <div
+                    v-if="docForm.coverUrl"
+                    class="el-upload-list el-upload-list--picture-card is-disabled"
+                  >
+                    <!-- <div class="el-upload-list__item is-success"> -->
+                    <el-image
+                      style="width: 150px; height: 100px"
+                      :src="docForm.coverUrl"
+                      fit="fit"
+                    />
+                    <span class="el-upload-list__item-actions">
+                      <span
+                        class="el-upload-list__item-delete"
+                        @click.stop="handleRemove()"
+                      >
+                        <el-icon><Delete /></el-icon>
+                      </span>
+                    </span>
+                    <!-- </div> -->
+                  </div>
+                  <el-icon v-else class="avatar-uploader-icon">
+                    <Plus />添加文章封面
+                  </el-icon>
+                </el-upload>
+              </div>
+            </el-col>
+            <!-- 文章图片选择区 -->
+            <el-col :span="isMobile ? 24 : 14" class="mt-mobile-2">
+              <div>
+                <!-- 图片来源标签页 -->
+                <el-row style="height: 30px; margin-bottom: 5px">
+                  <el-col :span="12">
+                    <el-tag type="info">正文图</el-tag>
+                  </el-col>
+                  <el-col :span="12">
+                    <el-tag type="info">标签图</el-tag>
+                  </el-col>
+                </el-row>
+                <!-- 图片备选区域 -->
+                <el-row>
+                  <el-col>
+                    <el-scrollbar>
+                      <div class="selectImgBox">
+                        <div style="background-color: #ccc">
+                          <el-popover
+                            :width="300"
+                            v-for="imgLink in docImgLinks"
+                            :key="imgLink"
+                          >
+                            <template #reference>
+                              <el-image
+                                class="selectImgItem"
+                                :src="imgLink"
+                                fit="fit"
+                                @click="handleSelectImg(imgLink)"
+                              />
+                            </template>
+                            <template #default>
+                              <div>
+                                <el-image
+                                  style="height: 200px"
+                                  :src="imgLink"
+                                  fit="fit"
+                                />
+                              </div>
+                            </template>
+                          </el-popover>
+                        </div>
+                      </div>
+                    </el-scrollbar>
+                  </el-col>
+                </el-row>
+              </div>
+            </el-col>
+          </el-row>
+        </el-col>
+      </el-row>
+      <!-- 文章简介 -->
+      <el-row align="middle">
+        <el-col :span="isMobile ? 24 : 3" class="label-col">文章简介</el-col>
+        <el-col :span="isMobile ? 24 : 21">
+          <el-input
+            v-model="docForm.summary"
+            :rows="3"
+            type="textarea"
+            placeholder="请输入文章简介"
           />
-        </el-select>
-      </el-form-item>
+        </el-col>
+      </el-row>
+      <!-- 是否原创 -->
+      <el-row align="middle">
+        <el-col :span="isMobile ? 24 : 3" class="label-col">是否原创</el-col>
+        <el-col :span="isMobile ? 24 : 21">
+          <el-radio-group v-model="docForm.original">
+            <el-radio label="true">是</el-radio>
+            <el-radio label="false">否</el-radio>
+          </el-radio-group>
+        </el-col>
+      </el-row>
+      <!-- 文章权限 -->
+      <el-row align="middle">
+        <el-col :span="isMobile ? 24 : 3" class="label-col">文章权限</el-col>
+        <el-col :span="isMobile ? 24 : 21">
+          <el-radio-group v-model="docForm.authType">
+            <el-radio label="1">公开</el-radio>
+            <el-radio label="0">私密</el-radio>
+          </el-radio-group>
+        </el-col>
+      </el-row>
+      <!-- 是否置顶（功能移到外部操作） -->
+      <!-- 是否开启评论（保留功能） -->
 
-      <el-form-item label="标签" prop="tags">
-        <el-select
-          v-model="postForm.tags"
-          multiple
-          placeholder="请选择文章标签"
-        >
-          <el-option
-            v-for="item in tags"
-            :key="item.id"
-            :label="item.name"
-            :value="item.id"
-          />
-        </el-select>
-      </el-form-item>
-
-      <el-form-item label="封面" prop="cover">
-        <el-upload
-          class="cover-upload"
-          action="#"
-          :auto-upload="false"
-          :show-file-list="false"
-          :on-change="handleCoverChange"
-        >
-          <el-image
-            v-if="postForm.cover"
-            :src="postForm.cover"
-            class="cover-preview"
-          />
-          <el-button v-else type="primary">
-            <el-icon><Plus /></el-icon>
-            上传封面
-          </el-button>
-        </el-upload>
-      </el-form-item>
-
-      <el-form-item label="摘要" prop="summary">
-        <el-input
-          v-model="postForm.summary"
-          type="textarea"
-          :rows="3"
-          placeholder="请输入文章摘要"
-        />
-      </el-form-item>
-
-      <el-form-item label="内容" prop="content">
-        <el-input
-          v-model="postForm.content"
-          type="textarea"
-          :rows="10"
-          placeholder="请输入文章内容"
-        />
-      </el-form-item>
-
-      <el-form-item>
-        <el-button type="primary" :loading="loading" @click="handleSubmit">
-          {{ isEdit ? '保存修改' : '发布文章' }}
-        </el-button>
-        <el-button @click="router.back()">取消</el-button>
-      </el-form-item>
-    </el-form>
+      <!-- 弹出层底部按钮区域 -->
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="dialogVisible = false">取消</el-button>
+          <el-button v-if="docForm.status !== '1'" @click="saveDraft">保存草稿</el-button>
+          <el-button type="primary" @click="publish">发布</el-button>
+        </span>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { Plus } from '@element-plus/icons-vue'
+import { ref, onMounted, computed } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import type { FormInstance, UploadFile } from 'element-plus'
+import { ArrowLeft, Plus, Delete } from '@element-plus/icons-vue'
+import SelectDocTags from '@/components/SelectDocTags.vue'
 
-const route = useRoute()
 const router = useRouter()
-const formRef = ref<FormInstance>()
-const loading = ref(false)
+const route = useRoute()
 
 // 判断是否为编辑模式
-const isEdit = computed(() => {
-  return route.name === 'PostEdit'
+const isEdit = computed(() => !!route.params.id)
+
+// 判断是否为移动端
+const isMobile = computed(() => window.innerWidth <= 768)
+
+// 文章表单类型定义
+interface DocForm {
+  id?: string
+  title: string
+  content: string
+  summary: string
+  coverUrl: string
+  tags: Array<{
+    id: number
+    content: string
+  }>
+  original: string
+  authType: string
+  status: string
+  category?: string
+}
+
+// 弹窗相关
+const dialogVisible = ref(false)
+const selectTagDialogFlag = ref(false)
+const tagDialog = ref()
+const tagRow = ref()
+
+// 标签相关
+const showAddTagFlag = ref(true)
+const tagDialogStyle = computed(() => {
+  if (!tagRow.value) return {}
+  const rect = tagRow.value.$el.getBoundingClientRect()
+  return {
+    position: 'absolute',
+    top: `${rect.bottom + 5}px`,
+    left: `${rect.left}px`
+  }
 })
 
-// 表单数据
-const postForm = ref({
+// 文章表单数据
+const docForm = ref<DocForm>({
   title: '',
-  categoryId: '',
-  tags: [] as number[],
-  cover: '',
+  content: '',
   summary: '',
-  content: ''
+  coverUrl: '',
+  tags: [],
+  original: 'true',
+  authType: '1',
+  status: '0',
+  category: ''
 })
 
-// 表单验证规则
-const rules = {
-  title: [
-    { required: true, message: '请输入文章标题', trigger: 'blur' },
-    { min: 2, max: 100, message: '标题长度在 2 到 100 个字符', trigger: 'blur' }
-  ],
-  categoryId: [
-    { required: true, message: '请选择文章分类', trigger: 'change' }
-  ],
-  content: [
-    { required: true, message: '请输入文章内容', trigger: 'blur' }
-  ]
-}
+// 上传相关
+const isDisabledUpload = ref(false)
+const uploadedFiles = ref([])
+const docImgLinks = ref<string[]>([])
 
-// 模拟数据
-const categories = ref([
-  { id: 1, name: '前端开发' },
-  { id: 2, name: '后端开发' },
-  { id: 3, name: '移动开发' }
-])
-
-const tags = ref([
-  { id: 1, name: 'Vue3' },
-  { id: 2, name: 'React' },
-  { id: 3, name: 'TypeScript' }
-])
-
-// 处理封面上传
-const handleCoverChange = (file: UploadFile) => {
-  // TODO: 实现图片上传
-  postForm.value.cover = URL.createObjectURL(file.raw!)
-}
-
-// 提交表单
-const handleSubmit = async () => {
-  if (!formRef.value) return
-  
-  try {
-    await formRef.value.validate()
-    loading.value = true
-    
-    // TODO: 调用创建/更新文章接口
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    
-    ElMessage.success(isEdit.value ? '更新成功' : '发布成功')
-    router.push('/posts')
-  } catch (error: any) {
-    console.error(error)
-    ElMessage.error(error.message || '操作失败')
-  } finally {
-    loading.value = false
-  }
-}
-
-// 获取文章详情
-const getPostDetail = async (id: string | string[]) => {
-  // TODO: 调用获取文章详情接口
-  postForm.value = {
-    title: '示例文章',
-    categoryId: 1,
-    tags: [1, 2],
-    cover: '',
-    summary: '这是文章摘要',
-    content: '这是文章内容'
-  }
-}
-
+// 如果是编辑模式，获取文章数据
 onMounted(async () => {
   if (isEdit.value) {
-    const id = route.params.id
-    await getPostDetail(id)
+    try {
+      const postId = route.params.id
+      // 模拟接口调用
+      const mockPost: DocForm = {
+        id: postId as string,
+        title: '测试文章标题',
+        content: '测试文章内容',
+        status: '1',
+        summary: '',
+        coverUrl: '',
+        tags: [],
+        original: 'true',
+        authType: '1',
+        category: ''
+      }
+      docForm.value = mockPost
+    } catch (error) {
+      ElMessage.error('获取文章失败')
+      router.back()
+    }
   }
 })
+
+// 显示发布弹窗
+const showPublishDialog = () => {
+  if (!docForm.value.title.trim()) {
+    return ElMessage.warning('请输入文章标题')
+  }
+  if (!docForm.value.content.trim()) {
+    return ElMessage.warning('请输入文章内容')
+  }
+
+  // 如果是编辑模式，直接更新
+  if (isEdit.value) {
+    publish()
+    return
+  }
+
+  dialogVisible.value = true
+}
+
+// 保存草稿
+const saveDraft = async () => {
+  try {
+    docForm.value.status = '0'
+    // TODO: 调用保存草稿接口
+    ElMessage.success('草稿保存成功')
+    dialogVisible.value = false
+  } catch (error) {
+    ElMessage.error('保存失败')
+  }
+}
+
+// 发布文章
+const publish = async () => {
+  try {
+    docForm.value.status = '1'
+    // TODO: 调用发布接口
+    console.log('发布数据:', docForm.value)
+    
+    ElMessage.success('发布成功')
+    dialogVisible.value = false
+    router.push('/posts')
+  } catch (error) {
+    ElMessage.error('发布失败')
+  }
+}
+
+// 标签相关方法
+const handleCloseTag = (tag: { id: number }) => {
+  docForm.value.tags = docForm.value.tags.filter(t => t.id !== tag.id)
+}
+
+// 上传相关方法
+const handleRemove = () => {
+  docForm.value.coverUrl = ''
+}
+
+const uploadSuccessHandle = (response: any) => {
+  if (response.code === 200) {
+    docForm.value.coverUrl = response.data
+    ElMessage.success('上传成功')
+  } else {
+    ElMessage.error('上传失败')
+  }
+}
+
+const uploadErrorHandle = () => {
+  ElMessage.error('上传失败')
+}
+
+const handleSelectImg = (imgLink: string) => {
+  docForm.value.coverUrl = imgLink
+}
 </script>
 
 <style lang="scss" scoped>
 .post-edit {
-  max-width: 800px;
-  margin: 0 auto;
-  padding: 20px;
+  min-height: 100vh;
+  background-color: #fff;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 
-  .edit-header {
-    margin-bottom: 24px;
+  // 用于隐藏默认布局的导航栏
+  .hide-nav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: #fff;
+    z-index: -1;
+  }
 
-    h2 {
-      font-size: 24px;
-      color: #333;
-      margin: 0;
+  @media screen and (max-width: 768px) {
+    z-index: 2000;
+  }
+
+  .action-bar {
+    position: relative;
+    z-index: 1002;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 24px;
+    background-color: #fff;
+    border-bottom: 1px solid #f0f0f0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    height: 56px;
+    box-sizing: border-box;
+    flex-shrink: 0;
+
+    // PC端布局样式
+    .pc-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      
+      .left {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+
+        .divider {
+          color: #ddd;
+        }
+
+        .title-input {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+
+          .label {
+            font-size: 14px;
+            color: #666;
+          }
+
+          .el-input {
+            width: 400px;
+          }
+        }
+      }
+
+      .right {
+        display: flex;
+        gap: 12px;
+      }
+    }
+
+
+    .mobile-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 12px;
+    }
+
+    // 移动端布局样式
+    .mobile-header {
+      display: none;
+    }
+
+    .title-input {
+      padding: 8px 12px;
+      width: 100%;
+
+      .el-input {
+        width: 100%;
+
+        :deep(.el-input__wrapper) {
+          padding: 0;
+          border: none;
+          box-shadow: none;
+        }
+
+        :deep(.el-input__inner) {
+          font-size: 16px;
+          height: 24px;
+          line-height: 24px;
+          padding: 0;
+        }
+
+        :deep(.el-input__count) {
+          background: transparent;
+          padding: 0;
+          height: 20px;
+          line-height: 20px;
+        }
+      }
+    }
+
+    @media screen and (max-width: 768px) {
+      padding: 0 8px;
+      gap: 0;
+      height: auto;
+      background-color: #fff;
+      .pc-header {
+        display: none;
+      }
+     .mobile-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 12px;
+     }
     }
   }
 
-  .edit-form {
-    background: #fff;
-    padding: 24px;
-    border-radius: 8px;
+  .editor-container {
+    position: relative;
+    flex: 1;
+    overflow: hidden;
+    background-color: #fff;
 
-    .cover-upload {
-      :deep(.el-upload) {
-        width: 100%;
-        max-width: 360px;
+    @media screen and (max-width: 768px) {
+    }
+
+    .editor-content {
+      padding: 24px;
+      max-width: 800px;
+      margin: 0 auto;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+
+      :deep(.el-textarea__inner) {
+        flex: 1;
+        height: 100% !important;
+        font-size: 16px;
+        line-height: 1.8;
+        padding: 16px;
+        border: none;
+        box-shadow: none;
+        background-color: transparent;
       }
 
-      .cover-preview {
-        width: 100%;
-        height: 200px;
-        object-fit: cover;
-        border-radius: 4px;
+      @media screen and (max-width: 768px) {
+        padding: 12px;
       }
+    }
+  }
+
+  @media screen and (max-width: 768px) {
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+// 封面上传样式
+.cover-uploader {
+  :deep(.el-upload) {
+    border: 1px dashed var(--el-border-color);
+    border-radius: 6px;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    transition: var(--el-transition-duration);
+    
+    &:hover {
+      border-color: var(--el-color-primary);
     }
   }
 }
 
-// 响应式适配
-@media screen and (max-width: 768px) {
-  .post-edit {
-    padding: 16px;
+.cover-uploader-icon {
+  font-size: 28px;
+  color: #8c939d;
+  width: 178px;
+  height: 178px;
+  text-align: center;
+  line-height: 178px;
+}
 
-    .edit-header {
-      margin-bottom: 16px;
+.cover-image {
+  width: 178px;
+  height: 178px;
+  display: block;
+  object-fit: cover;
+}
 
-      h2 {
-        font-size: 20px;
+// 添加图片选择相关样式
+.selectImgBox {
+  height: 200px;
+  overflow-y: auto;
+  
+  .selectImgItem {
+    width: 80px;
+    height: 80px;
+    margin: 5px;
+    cursor: pointer;
+  }
+}
+
+// 标签相关样式
+.mx-1 {
+  margin: 0 5px;
+}
+
+// 布局相关样式
+.label-col {
+  line-height: 32px;
+}
+
+// 修复 el-image 的 fit 属性
+.el-image {
+  &[fit="fit"] {
+    object-fit: contain;  // 修改为合法的 fit 值
+  }
+}
+
+// 发布弹窗样式
+.publish-dialog {
+  :deep(.el-dialog) {
+    @media screen and (max-width: 768px) {
+      margin: 0;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      
+      .el-dialog__body {
+        padding: 16px;
+        flex: 1;
+        overflow: auto;
       }
     }
+  }
 
-    .edit-form {
-      padding: 16px;
+  .el-row {
+    margin-bottom: 16px;
+
+    @media screen and (max-width: 768px) {
+      .label-col {
+        margin-bottom: 8px;
+        font-weight: 500;
+      }
+    }
+  }
+
+  .mt-mobile-2 {
+    @media screen and (max-width: 768px) {
+      margin-top: 16px;
     }
   }
 }

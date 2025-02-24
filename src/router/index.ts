@@ -26,39 +26,44 @@ const routes: RouteRecordRaw[] = [
       },
       {
         path: 'posts',
-        name: 'Posts',
-        component: () => import('@/views/posts/PostList.vue'),
-        meta: { 
-          title: '文章列表',
-          requiresAuth: true 
-        }
-      },
-      {
-        path: 'posts/:id',
-        name: 'PostDetail',
-        component: () => import('@/views/posts/PostDetail.vue'),
-        meta: { 
-          title: '文章详情',
-          requiresAuth: true 
-        }
-      },
-      {
-        path: 'posts/create',
-        name: 'PostCreate',
-        component: () => import('@/views/posts/PostEdit.vue'),
-        meta: { 
-          title: '创建文章',
-          requiresAuth: true 
-        }
-      },
-      {
-        path: 'posts/edit/:id',
-        name: 'PostEdit',
-        component: () => import('@/views/posts/PostEdit.vue'),
-        meta: { 
-          title: '编辑文章',
-          requiresAuth: true 
-        }
+        children: [
+          {
+            path: '',
+            name: 'Posts',
+            component: () => import('@/views/posts/PostList.vue'),
+            meta: { 
+              title: '文章列表',
+              requiresAuth: true 
+            }
+          },
+          {
+            path: 'create',
+            name: 'CreatePost',
+            component: () => import('@/views/posts/PostEdit.vue'),
+            meta: { 
+              title: '创建文章',
+              requiresAuth: true 
+            }
+          },
+          {
+            path: 'edit/:id',
+            name: 'PostEdit',
+            component: () => import('@/views/posts/PostEdit.vue'),
+            meta: { 
+              title: '编辑文章',
+              requiresAuth: true 
+            }
+          },
+          {
+            path: ':id',
+            name: 'PostDetail',
+            component: () => import('@/views/posts/PostDetail.vue'),
+            meta: { 
+              title: '文章详情',
+              requiresAuth: true 
+            }
+          }
+        ]
       }
     ]
   },
