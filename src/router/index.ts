@@ -39,7 +39,7 @@ const routes: RouteRecordRaw[] = [
           {
             path: 'create',
             name: 'CreatePost',
-            component: () => import('@/views/posts/PostEdit.vue'),
+            component: () => import('@/views/posts/PostEdit3.vue'),
             meta: { 
               title: '创建文章',
               requiresAuth: true 
