@@ -9,41 +9,49 @@
         <el-input v-model="docForm.title" 
           placeholder="请输入文章标题 (5-100字)" 
           maxlength="100"
-          show-word-limit
+          :show-word-limit="!isMobile"
           type="text">
           <!-- <template #prepend>标题</template> -->
         </el-input>
       </div>
       <div class="editor-btn">
-        <el-button type="primary" @click="handleSaveDraft">保存草稿</el-button>
-        <el-button type="primary" @click="handleSave">保存</el-button>
+        <el-button type="primary" :size="isMobile?'small':'default'" @click="handleSaveDraft">保存草稿</el-button>
+        <el-button type="primary" :size="isMobile?'small':'default'" @click="handleSave">保存</el-button>
       </div>
     </div>
     <div class="editor-main">
-      <div id="vditor"></div>
+      <Vditor v-model="docForm.content" :config="vditorConfig"></Vditor>
     </div>
   </div>
+
+  <SubmitPostDialog
+    v-model="dialogVisible"
+    :initial-data="docForm"
+    @confirm="handlePublishConfirm"
+  />
 </template>
 
-<script setup lang="ts">
+<script setup>
+// 顶部添加组件引入
+import SubmitPostDialog from '@/components/post/SubmitPostDialog.vue'
 import { useRouter } from 'vue-router';
-import { ref, reactive, onMounted } from 'vue';
-// import Vditor from 'vditor'
-// import 'vditor/dist/index.css' // 引入样式，要不然页面错乱
-import createVditor from '@/vditor/index'
+import { ref, reactive, onMounted, onBeforeUnmount, watch } from 'vue';
+import Vditor from '@/components/vditor/Vditor.vue';
 
 const vditor = ref()
-
-
-onMounted(() => {
-  vditor.value = createVditor('vditor')
-})
-
-const docForm = reactive({
+const vditorConfig = ref({})
+const docForm = ref({
   title: '',
   content: '',
-  tags: [],
-  categories: [],
+  tags: [
+    { id: 1, name: "标签1", color: "primary" },
+    { id: 2, name: "标签2", color: "success" },
+    { id: 3, name: "标签3", color: "warning" },
+  ],
+  categories: [
+    { label: '技术文章', value: 1 },
+    { label: '生活随笔', value: 2 }
+  ],
   status: 'draft',
   password: '',
   password_confirmation: '',
@@ -54,6 +62,8 @@ const docForm = reactive({
   cover_thumb_url: '',
   cover_medium:'',
 })
+const isMobile = window.innerWidth < 768;
+let dialogVisible = ref(false);
 
 /**
  * 返回按钮
@@ -66,11 +76,24 @@ const handleBack = () => {
  * 保存草稿按钮
  */
 const handleSaveDraft = () => {
+  console.log(docForm.value.content);
+  
 }
 /**
  * 保存按钮
  */
 const handleSave = () => {
+  dialogVisible.value = true
+}
+// 添加发布确认处理
+const handlePublishConfirm = async (formData) => {
+  try {
+    // 这里调用API接口提交数据
+    console.log('提交数据:', formData)
+    ElMessage.success('文章发布成功')
+  } catch (error) {
+    ElMessage.error('发布失败: ' + error.message)
+  }
 }
 
 </script>
@@ -87,9 +110,11 @@ const handleSave = () => {
   z-index: 1001;
   display: flex;
   flex-direction: column;
+  height: 100vh;
 
   .editor-top{
-    padding: 2px 20px;
+    flex: 0 0 auto;
+    padding: 10px 20px;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -123,9 +148,23 @@ const handleSave = () => {
       }
     }
   }
+  .editor-main{
+    flex: 1;
+    min-height: 0;
+  }
   
 }
-
 @media (max-width: 768px) {
+  .editor-container{
+    .editor-top{
+      padding: 5px 10px;
+      .editor-btn{
+
+        :deep(.el-button){
+          padding: 8px 8px;
+        }
+      }
+    }
+  }
 }
 </style>

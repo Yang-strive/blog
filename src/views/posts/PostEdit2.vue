@@ -1,21 +1,11 @@
 <template>
   <div class="article-edit">
-    
-
     <!-- 顶部操作栏 -->
     <el-row>
       <el-col :span="16">
         <el-row>
-          <!-- 顶部返回按钮 -->
-          <div class="header-bar">
-            <el-button class="back-btn" @click="handleBack">
-              <el-icon><ArrowLeft /></el-icon>返回
-            </el-button>
-          </div>
           <!-- 文章标题 -->
-          <!-- <el-col>
-            <el-row> -->
-          <el-col :span="2" class="align-center">
+          <el-col :span="3" class="align-center">
             <span>文章标题：</span>
           </el-col>
           <el-col :span="20">
@@ -29,8 +19,6 @@
               class="title-box"
             />
           </el-col>
-          <!-- </el-row>
-          </el-col> -->
         </el-row>
       </el-col>
       <el-col :span="6" :offset="2">
@@ -58,18 +46,14 @@
         </el-row>
       </el-col>
     </el-row>
-    <!-- markdown编辑区域 -->
-    <MdEditor
-      v-model="docForm.content"
-      @onUploadImg="onUploadImg"
-      @onHtmlChanged="getHtmlText"
-      :footers="footers"
-    >
-      <template #defFooters>
-        <span>markdown {{ validMDStringCount }} 字数</span>
-        <span>html {{ validHTMLStringCount }} 字数</span>
-      </template>
-    </MdEditor>
+
+    <!-- markdown编辑区域-->
+    <el-row>
+      <el-col :span="24">
+        <div ref="vditor" class="markdown-editor-box"></div>
+      </el-col>
+    </el-row>
+
 
     <!-- 发布按钮-弹出层 -->
     <el-dialog class="el-dialog" v-model="dialogFormVisible" title="发布文章">
@@ -254,15 +238,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from "vue";
-import { useRouter } from "vue-router";
-import {MdEditor} from "md-editor-v3";
+import { ref, computed, onMounted } from "vue";
 import "md-editor-v3/lib/style.css";
+// import axios from "axios";
 import { onBeforeRouteLeave } from "vue-router";
 import { ElMessage } from "element-plus";
 import { regEXConstant, isNotEmpty, isEmpty } from "@/utils/commonUtils";
-import * as blogApi from "@/request/api/blogApi"
-import * as fileApi from "@/request/api/fileApi"
+// import "@/vditor";
+import Vditor from 'vditor'
+import 'vditor/dist/index.css' // 引入样式，要不然页面错乱
+
 
 ///// ============== 属性定义 start =================
 interface DocForm{
@@ -305,13 +290,66 @@ const showAddTagFlag = computed(() => {
   return isEmpty(docForm.value.tags) ? true : !(docForm.value.tags.length >= 7);
 });
 
+// 初始化vditor 实例
+const vditor = ref<any>(null)
+onMounted(() => {
+  initVditor()
+})
 
-// 将插槽中的组件下标放到对应的位置即可显示
-const footers = [0, "=", 1, "scrollSwitch"];
+// TODO：toolbar需要进行移动端适配
+const initVditor = () => {
+  vditor.value = new Vditor(vditor.value, {
+    cache:{id: 'vditor'},
+    // height: "80%",
+    placeholder: '请输入内容...',
+    toolbar: [
+      'emoji',
+      'headings',
+      'bold',
+      'italic',
+      'strike',
+      'link',
+      '|',
+      'list',
+      'ordered-list',
+      'check',
+      'outdent',
+      'indent',
+      '|',
+      'quote',
+      'line',
+      'code',
+      'inline-code',
+      'insert-before',
+      'insert-after',
+      '|',
+      'upload',
+      'record',
+      'table',
+      '|',
+      'undo',
+      'redo',
+      '|',
+      'fullscreen',
+      'preview',
+      'outline',
+      'code-theme',
+      'content-theme',
+      'export',
+      'devtools',
+      'info',
+      'help'
+    ],
+    after() {
+      // vditor.value.setValue('欢迎使用 Vditor!')
+    }
+  })
+}
 
-let dialogFormVisible = ref(false);
 
-let isDisabledUpload = ref(false);
+let dialogFormVisible = ref(false); // 弹窗显示控制
+
+let isDisabledUpload = ref(false); // 上传按钮是否禁用控制
 
 interface UploadedFile {
   name: string;
@@ -319,24 +357,18 @@ interface UploadedFile {
 }
 let uploadedFiles = ref<UploadedFile[]>([]);
 
-// let uploadedFiles = ref([
-//   {
-//     name: "充实_4c29866c9b22809b4ee2233fc3374f5f.jpg",
-//     url: "http://localhost:20011/file/blog/getFilePreview/1710135462735003650",
-//   },
-// ]);
 
 // 文章中所有上传到服务器的图片链接 只取前10张
 let docImgLinks = computed(() => {
   // 获取文本内容
-  let content = docForm.value.content;
+  let content = vditor.value.getValue();
   if(isEmpty(content)) return [];
 
   // 获取所有服务器的链接（后续上传的url得改变，需要区分上传的文件类型）
-  let sourceUrls = content.match(regEXConstant.blogFilePreviewUrl);
-  let result = null;
+  let sourceUrls = content.match(regEXConstant.testImagePreviewUrl);
+  let result = <string[]>[];
   if(sourceUrls && sourceUrls.length>0){
-    result = sourceUrls.map((urlStr) => {
+    result = sourceUrls.map((urlStr: string) => {
     return urlStr.substring(urlStr.indexOf("(") + 1, urlStr.lastIndexOf(")"));
   });
   }
@@ -369,8 +401,6 @@ var validateRules = ref({
 });
 ///// ============== 属性定义 end =================
 
-const router = useRouter();
-
 // 小知识：async关键字是用于异步函数的关键字，标识的方法会返回一个Promise对象，可以通过.then()方法来处理异步操作的结果
 /**
  * 上传文件的方法
@@ -389,10 +419,13 @@ const onUploadImg = async (files:File[], callback:Function) => {
         setTimeout(() => {
           // 模拟上传成功
           const res = {
+            // 创建随机数模拟id
+            id: Math.floor(Math.random() * (999 - 100 + 1)) + 100,
             code: "00000", 
             data:{
-              sysUrl: "https://picsum.photos/400/300"
-            }
+              sysUrl: "https://dummyimage.com/500x300/FF6600&text=Image"
+            },
+            msg: "上传成功",
           }
           rev(res)
         }, 1000)
@@ -416,7 +449,7 @@ const onUploadImg = async (files:File[], callback:Function) => {
   );
 
   callback(
-    res.map((res) => {
+    res.map((res:any) => {
       if (res.code === '00000') {
         return res.data.sysUrl; //拿到url信息并返回给调用者
       } else {
@@ -433,6 +466,7 @@ const saveDraft = () => {
    * 1. 文章内容不能为空
    * 2. 文章标题自动赋值为：【无标题】
    */
+   docForm.value.content = vditor.value.getValue();
   var formData = docForm.value;
   let msg = validationTemporary(formData);
   if(msg && msg !== '' ){
@@ -453,9 +487,6 @@ const saveDraft = () => {
       code: "00000",
       data:{
         id: "1710135462735003650",
-        title: "【无标题】",
-        content: "这是一篇测试文章",
-        summary: "这是一篇测试文章",
       } 
     }
     console.log("保存成功！", res.data);
@@ -489,6 +520,7 @@ const publish = () => {
   // 打印输出后端请求对象
   try {
     //校验
+    docForm.value.content = vditor.value.getValue();
     var formData = docForm.value;
     let msg = validationSubmit(formData);
     if(msg && msg !== ''){
@@ -498,6 +530,12 @@ const publish = () => {
     // TODO 调用后端接口，发布文章
     // 休眠1秒，模拟发布
     setTimeout(() => {
+      let res = {
+        code: "00000",
+        data:{
+          id: "1710135462735003650",
+        } 
+      }
       // 将响应后的数据重新赋值给页面
       docForm.value = { ...docForm.value, ...res.data };
       // 隐藏发布弹窗
@@ -593,7 +631,7 @@ const uploadErrorHandle = (error: any) => {
 /**
  * 关闭标签处理函数
  */
-const handleCloseTag = (tag) => {
+const handleCloseTag = (tag:any) => {
   console.log(docForm.value.tags.indexOf(tag));
   // 遍历录入的标签列表，匹配要去除的标签进行删除
   docForm.value.tags.splice(docForm.value.tags.indexOf(tag), 1);
@@ -602,14 +640,14 @@ const handleCloseTag = (tag) => {
 
 // 拿到预览生成的html文本
 const getHtmlText = (htmlContent: string) => {
-  docForm.value.htmlContent = htmlContent;
+  docForm.value.htmlContent = vditor.value.getHTML();
   // console.log(docForm.value.content);
 };
 
 // 计算markdown的有效字符
 const validMDStringCount = computed(() => {
   // 去除无效字符
-  const validString = docForm.value.content.trim().replace(/(\n|\s)/g, "");
+  const validString = vditor.value.getValue().trim().replace(/(\n|\s)/g, "");
   // 计算有效字符串个数
   return validString.length;
 });
@@ -617,7 +655,7 @@ const validMDStringCount = computed(() => {
 //计算预览的html有效字符
 const validHTMLStringCount = computed(() => {
   // 去除无效字符
-  const validContent = docForm.value.htmlContent
+  const validContent = vditor.value.getHTML()
     .replace(/<\/?[^>]+(>|$)/g, "")
     .replace(/\s/g, "");
   // 使用DOMParser解码HTML内容
@@ -715,11 +753,11 @@ function getAllDocFileId() {
  * 获取所有上传到服务器的资源文件url
  */
 function getAllDocFileUrl() {
-  let content = docForm.value.content;
+  let content = vditor.value.getValue();
   // 获取所有图片链接
-  let sourceUrls = content.match(regEXConstant.blogFilePreviewUrl);
+  let sourceUrls = content.match(regEXConstant.testImagePreviewUrl);
   if(sourceUrls && sourceUrls.length > 0){
-    return sourceUrls.map((urlStr) => {
+    return sourceUrls.map((urlStr:string) => {
       return urlStr.substring(urlStr.indexOf("("), urlStr.lastIndexOf(")"));
     });
   }
@@ -730,12 +768,12 @@ function getAllDocFileUrl() {
  * 对页面跳转做拦截提示
  */
 window.onbeforeunload = function () {
-  if (docForm.value.content.trim().length > 0) {
+  if (vditor.value.getValue().trim().length > 0) {
     return "你确定要离开当前页面吗？";
   }
 };
 onBeforeRouteLeave((to, from, next) => {
-  if (to !== from && docForm.value.content.trim().length > 0) {
+  if (to !== from && vditor.value.getValue().trim().length > 0) {
     if (confirm("将要离开当前页面，请确认内容已保存！")) {
       next(); // 允许离开当前页面
     } else {
@@ -745,25 +783,15 @@ onBeforeRouteLeave((to, from, next) => {
     next();
   }
 });
-
-// 返回按钮处理函数
-const handleBack = () => {
-  if (docForm.value.content.trim().length > 0) {
-    ElMessage.confirm('内容未保存，确定要离开吗？', '提示', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'warning'
-    }).then(() => {
-      router.back();
-    }).catch(() => {})
-  } else {
-    router.back();
-  }
-}
 </script>
 
 
 <style lang="scss" scoped>
+.markdown-editor-box{
+  width: 100%;
+  // 设置剩下的高度为盒子的高度
+  height: 750px;
+}
 .article-edit {
   min-height: 100vh;
   background-color: #fff;
@@ -886,29 +914,6 @@ const handleBack = () => {
       }
     }
   }
-
-  /* 顶部返回栏 */
-  .header-bar {
-
-    .back-btn {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      padding: 8px 16px;
-      font-size: 14px;
-      border: none;
-      background: none;
-      color: #606266;
-      
-      &:hover {
-        color: var(--el-color-primary);
-      }
-
-      .el-icon {
-        font-size: 16px;
-      }
-    }
-  }
 }
 
 // 全局样式
@@ -950,15 +955,6 @@ const handleBack = () => {
         width: calc(33.33% - 8px);
         height: 60px;
         margin: 0;
-      }
-    }
-
-    .header-bar {
-      padding: 8px 12px;
-
-      .back-btn {
-        padding: 6px 12px;
-        font-size: 13px;
       }
     }
   }
